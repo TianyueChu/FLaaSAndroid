@@ -167,8 +167,11 @@ public class LoginActivity extends AppCompatActivity {
                     // prepare filename (e.g., Red_samples_iid.bin)
                     String filename = app.getName() + "_" + datasetType.getFilename();
 
-                    // download samples
-                    samplesDownloaded(response.body(), filename);
+                    if (response.body() != null) {
+                        samplesDownloaded(response.body(), filename);
+                    } else {
+                        Log.e(TAG, "Response body is null.");
+                    }
                 }
                 else {
                     Log.e(TAG, "Response from downloadSamples() was not successful.");

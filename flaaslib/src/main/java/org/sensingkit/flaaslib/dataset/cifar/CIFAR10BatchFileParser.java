@@ -26,6 +26,7 @@ public class CIFAR10BatchFileParser {
     private byte[] data;
 //    private ImageProcessor imageProcessor;
     int imageSize;
+    private boolean closed = false;
 
 
     // --- Static Methods ---
@@ -86,7 +87,7 @@ public class CIFAR10BatchFileParser {
         }
 
         if (size != TOTAL_BLOCK_SIZE) {
-            throw new RuntimeException("Something is wrong, size is not equal to BLOCK_SIZE");
+            throw new RuntimeException("Expected " + TOTAL_BLOCK_SIZE + " bytes, but got " + size + " bytes. Possible corrupted or incomplete file.");
         }
     }
 
@@ -178,8 +179,10 @@ public class CIFAR10BatchFileParser {
     public void close() {
         try {
             inputStream.close();
+            closed = true;
         } catch (IOException e) {
             e.printStackTrace();
         }
     }
+
 }

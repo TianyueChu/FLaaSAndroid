@@ -21,6 +21,7 @@ import org.sensingkit.flaaslib.utils.PersistentStore;
 import java.io.File;
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.List;
 import java.util.concurrent.ExecutionException;
 
 public class LocalTrainWorker extends AbstractFLaaSWorker {
@@ -192,45 +193,44 @@ public class LocalTrainWorker extends AbstractFLaaSWorker {
 
         // load samples from filenames
         for (File samplesFile : sampleFiles) {
-
-            CIFAR10BatchFileParser dataManager;
+            // CIFAR10BatchFileParser dataManager;
+            CIFAR10BatchFileParser dataManager = null;
             try {
-                // Init dataManager
-                dataManager = new CIFAR10BatchFileParser(
-                        samplesFile,
-                        0,
-                        224);
+                dataManager = new CIFAR10BatchFileParser(samplesFile, 0, 224);
+
+               // add samples
+                for (int i = 0; i < maxSamples; i++) {
+                    if (!dataManager.hasNext()) {
+                        Log.e(TAG, "Not enough samples.");
+                        break;
+                    }
+
+                    // get next
+                    dataManager.next();
+
+                    // get data
+                    float[] data = dataManager.getData(random.nextBoolean());
+                    int label = dataManager.getLabel();
+
+                    try {
+                        tl.addSample(data, CIFAR10BatchFileParser.getClass(label)).get();
+                    } catch (ExecutionException | InterruptedException e) {
+                        e.printStackTrace();
+                        return false;
+                    }
+                }
 
             } catch (IOException e) {
                 e.printStackTrace();
                 return false;
-            }
 
-            // add samples
-            for (int i = 0; i < maxSamples; i++) {
-
-                if (dataManager.hasNext()) {
-                    // get next
-                    dataManager.next();
-                } else {
-                    Log.e(TAG, "Not enough samples.");
-                    break;
-                }
-
-                // get data
-                float[] data = dataManager.getData(random.nextBoolean());
-                int label = dataManager.getLabel();
-
-                try {
-                    tl.addSample(data, CIFAR10BatchFileParser.getClass(label)).get();
-                } catch (ExecutionException | InterruptedException e) {
-                    e.printStackTrace();
-                    return false;
+            } finally {
+                if (dataManager != null) {
+                    dataManager.close(); // ensure closure even on failure
                 }
             }
-
             // close dataManager (not needed any more)
-            dataManager.close();
+            // dataManager.close();
         }
 
         // End and report -->
@@ -250,12 +250,26 @@ public class LocalTrainWorker extends AbstractFLaaSWorker {
         // delete the received samples
         PersistentStore.clearAllSamples(context, projectId, round, datasetType);
 
+        // Get training results
+        List<Float> epochResults = tl.getEpochResults();
+
+        // Check for NaN losses
+        for (int i = 0; i < epochResults.size(); i++) {
+            Float loss = epochResults.get(i);
+            if (loss == null || Float.isNaN(loss)) {
+                Log.w(TAG, "Epoch " + i + " produced NaN or null. Training failed.");
+                return false;
+            }
+        }
+
         // Add training epochs in performance results
-        JsonArray epochsArray = new JsonArray(epochs);
-        for (float epoch : tl.getEpochResults()) {
+        JsonArray epochsArray = new JsonArray(epochResults.size());
+        // JsonArray epochsArray = new JsonArray(epochs);
+        for (Float epoch : epochResults) {
             epochsArray.add(epoch);
         }
         addJsonArray("local_training_worker", "epochs", epochsArray);
+
 
         // save weights (replace existing file)
         if (globalModelFile.exists()) //noinspection ResultOfMethodCallIgnored
