@@ -15,6 +15,8 @@ limitations under the License.
 
 package org.tensorflow.lite.examples.transfer.api;
 
+import android.util.Log;
+
 import java.io.Closeable;
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -141,6 +143,28 @@ public final class TransferLearningModel implements Closeable {
   // Set to true when [close] has been called.
   private volatile boolean isTerminating = false;
 
+  private void dumpWeights(ByteBuffer[] params) {
+    for (int i = 0; i < params.length; i++) {
+      ByteBuffer buf = params[i].duplicate();
+      buf.rewind();
+      float min = Float.POSITIVE_INFINITY, max = Float.NEGATIVE_INFINITY, sum = 0;
+      boolean allNaN = true;
+      for (int j = 0; j < 10 && buf.remaining() >= 4; j++) {
+        float val = buf.getFloat();
+        Log.d("TransferLearningModel", "param[" + i + "][" + j + "] = " + val);
+        if (!Float.isNaN(val)) allNaN = false;
+        min = Math.min(min, val);
+        max = Math.max(max, val);
+        sum += val;
+      }
+      if (allNaN) {
+        Log.w("TransferLearningModel", "⚠️ param[" + i + "] contains all NaNs!");
+      } else {
+        Log.d("TransferLearningModel", "📊 param[" + i + "] min=" + min + ", max=" + max + ", mean=" + (sum / 10));
+      }
+    }
+  }
+
   public TransferLearningModel(ModelLoader modelLoader, Collection<String> classes) {
     classesByIdx = classes.toArray(new String[0]);
     this.classes = new TreeMap<>();
@@ -172,6 +196,15 @@ public final class TransferLearningModel implements Closeable {
       nextModelParameters[parameterIndex] = allocateBuffer(bufferSize);
     }
     initializeModel.initializeParameters(modelParameters);
+    // After initialization
+    Log.d("TransferLearningModel", "🚨 Dumping weights after init");
+    dumpWeights(modelParameters);
+    for (int i = 0; i < modelParameters.length; i++) {
+      modelParameters[i].rewind();
+      float val = modelParameters[i].getFloat();
+      Log.d("TransferLearningModel", "🧪 Init param[" + i + "] = " + val);
+      modelParameters[i].rewind();
+    }
 
     int[] optimizerStateElementSizes = optimizerModel.stateElementSizes();
     optimizerState = new ByteBuffer[optimizerStateElementSizes.length];
@@ -183,6 +216,8 @@ public final class TransferLearningModel implements Closeable {
       nextOptimizerState[elemIdx] = allocateBuffer(bufferSize);
       fillBufferWithZeros(optimizerState[elemIdx]);
     }
+    Log.d("TransferLearningModel", "🚨 Dumping weights after optimizer");
+    dumpWeights(modelParameters);
 
     trainingBatchBottlenecks =
         allocateBuffer(getTrainBatchSize() * numBottleneckFeatures() * FLOAT_BYTES);
@@ -221,11 +256,22 @@ public final class TransferLearningModel implements Closeable {
         imageBuffer.putFloat(f);
       }
       imageBuffer.rewind();
+      // 🧪 Log a few sample input floats
+      for (int i = 0; i < 5 && imageBuffer.remaining() >= 4; i++) {
+        Log.d("TransferLearningModel", "🧪 Input float[" + i + "] = " + imageBuffer.getFloat());
+      }
+      imageBuffer.rewind();  // Important!
 
       if (Thread.interrupted()) {
         return null;
       }
       ByteBuffer bottleneck = bottleneckModel.generateBottleneck(imageBuffer, null);
+
+      // 🧪 Log a few values from the bottleneck output
+      for (int i = 0; i < 5 && bottleneck.remaining() >= 4; i++) {
+        Log.d("TransferLearningModel", "🧪 Bottleneck[" + i + "] = " + bottleneck.getFloat());
+      }
+      bottleneck.rewind();
 
       trainingLock.lockInterruptibly();
       try {
@@ -248,7 +294,11 @@ public final class TransferLearningModel implements Closeable {
   public Future<Void> train(int numEpochs, LossConsumer lossConsumer) {
     checkNotTerminating();
 
+    Log.d("TransferLearningModel", "🚀 Entered train() with epochs = " + numEpochs);
+
     if (trainingSamples.size() < getTrainBatchSize()) {
+      Log.d("TransferLearningModel", "📦 trainingSamples = " + trainingSamples.size() + ", batchSize = " + getTrainBatchSize());
+
       throw new RuntimeException(
           String.format(
               "Too few samples to start training: need %d, got %d",
@@ -258,6 +308,7 @@ public final class TransferLearningModel implements Closeable {
     return executor.submit(
         () -> {
           trainingLock.lock();
+          Log.d("TransferLearningModel", "🔒 Acquired training lock, starting epoch loop.");
           try {
             epochLoop:
             for (int epoch = 0; epoch < numEpochs; epoch++) {
@@ -291,6 +342,13 @@ public final class TransferLearningModel implements Closeable {
                         trainingBatchClasses,
                         modelParameters,
                         modelGradients);
+
+                modelGradients[0].rewind();
+                for (int i = 0; i < 5 && modelGradients[0].remaining() >= 4; i++) {
+                  float grad = modelGradients[0].getFloat();
+                  Log.d("TransferLearningModel", "🧪 Grad param[0][" + i + "] = " + grad);
+                }
+                modelGradients[0].rewind();
                 totalLoss += loss;
                 numBatchesProcessed++;
 
@@ -300,6 +358,13 @@ public final class TransferLearningModel implements Closeable {
                     optimizerState,
                     nextModelParameters,
                     nextOptimizerState);
+
+                nextModelParameters[0].rewind();
+                for (int i = 0; i < 5 && nextModelParameters[0].remaining() >= 4; i++) {
+                  float param = nextModelParameters[0].getFloat();
+                  Log.d("TransferLearningModel", "🧪 Next param[0][" + i + "] = " + param);
+                }
+                nextModelParameters[0].rewind();
 
                 ByteBuffer[] swapBufferArray;
 
@@ -320,13 +385,19 @@ public final class TransferLearningModel implements Closeable {
               }
 
               float avgLoss = totalLoss / numBatchesProcessed;
+              Log.d("TransferLearningModel", "📊 Epoch " + epoch + " average loss = " + avgLoss);  // << add this
+
               if (lossConsumer != null) {
                 lossConsumer.onLoss(epoch, avgLoss);
               }
             }
 
             return null;
-          } finally {
+          }
+          catch (Exception e) {
+            Log.e("TransferLearningModel", "🔥 Exception inside training thread: " + e.getMessage(), e);
+            throw e;}
+          finally {
             trainingLock.unlock();
           }
         });
@@ -366,6 +437,10 @@ public final class TransferLearningModel implements Closeable {
       for (int classIdx = 0; classIdx < classes.size(); classIdx++) {
         predictions[classIdx] = new Prediction(classesByIdx[classIdx], confidences[classIdx]);
       }
+      for (Prediction p : predictions) {
+        Log.d("TransferLearningModel", "🔍 Prediction - class: " + p.getClassName() + ", confidence: " + p.getConfidence());
+      }
+
 
       //Arrays.sort(predictions, (a, b) -> -Float.compare(a.confidence, b.confidence));
       return predictions;
@@ -386,9 +461,9 @@ public final class TransferLearningModel implements Closeable {
   public void saveParameters(GatheringByteChannel outputChannel) throws IOException {
     parameterLock.readLock().lock();
     try {
-      outputChannel.write(modelParameters);
       for (ByteBuffer buffer : modelParameters) {
-        buffer.rewind();
+        buffer.rewind();  // Write from the beginning
+        outputChannel.write(buffer);
       }
     } finally {
       parameterLock.readLock().unlock();
@@ -407,9 +482,20 @@ public final class TransferLearningModel implements Closeable {
   public void loadParameters(ScatteringByteChannel inputChannel) throws IOException {
     parameterLock.writeLock().lock();
     try {
-      inputChannel.read(modelParameters);
-      for (ByteBuffer buffer : modelParameters) {
+      for (int i = 0; i < modelParameters.length; i++) {
+        ByteBuffer buffer = modelParameters[i];
+        buffer.clear();  // Make sure we're writing from the start
+        int read = 0;
+        while (buffer.hasRemaining()) {
+          int r = inputChannel.read(buffer);
+          if (r == -1) break;  // End of file
+          read += r;
+        }
         buffer.rewind();
+
+        float first = buffer.getFloat();
+        Log.d("TransferLearning", "🧪 First param to save in buffer[" + i + "] = " + first);
+        buffer.rewind();  // Reset again for model use
       }
     } finally {
       parameterLock.writeLock().unlock();

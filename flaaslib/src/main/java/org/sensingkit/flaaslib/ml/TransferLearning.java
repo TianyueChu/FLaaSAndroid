@@ -56,6 +56,7 @@ public class TransferLearning implements Closeable {
         this.epochResults = new ArrayList<>(epochs + 1);
     }
 
+
     // This method is thread-safe.
     public Future<Void> addSample(float[] input, String className) {
         return model.addSample(input, className);
@@ -74,10 +75,13 @@ public class TransferLearning implements Closeable {
      * Start training the model continuously until all epochs are done
      */
     public void startTraining() {
-
         try {
+            Log.d("TransferLearning", "Starting training...");
             model.train(epochs, (epoch, loss) -> {
-                //Log.d("TransferLearning", "Epoch " + epoch + ": " + loss);  // DEBUG
+                Log.d("TransferLearning", "Epoch " + epoch + " loss = " + loss);
+                if (Float.isNaN(loss) || Float.isInfinite(loss)) {
+                    Log.e("TransferLearning", "Loss went bad at epoch " + epoch);
+                }
                 this.epochResults.add(loss);
             }).get();
 
@@ -111,6 +115,13 @@ public class TransferLearning implements Closeable {
             ScatteringByteChannel scatter = inp.getChannel();
             model.loadParameters(scatter);
             inp.close();
+            // Add this log after loading:
+            Log.d("TransferLearning", "🔍 Checking model file: " + file.getAbsolutePath() + ", exists = " + file.exists() + ", length = " + file.length());
+            // Run a dummy prediction immediately to validate weights:
+            float[] dummyInput = new float[224 * 224 * 3]; // Zero-filled array (or random values)
+            Prediction[] preds = model.predict(dummyInput);
+            Log.d("TransferLearning", "🧪 Post-load dummy prediction: class = " + preds[0].getClassName() + ", confidence = " + preds[0].getConfidence());
+
         } catch (IOException e) {
             e.printStackTrace();
         }

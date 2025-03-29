@@ -148,11 +148,7 @@ public class LocalTrainWorker extends AbstractFLaaSWorker {
         PerformanceCheckpoint trainPerformance = new PerformanceCheckpoint();
 
         // init model
-        this.tl = new TransferLearning(
-                context,
-                model,
-                Arrays.asList(CIFAR10BatchFileParser.getClasses()),
-                epochs);
+        this.tl = new TransferLearning(context, model, Arrays.asList(CIFAR10BatchFileParser.getClasses()), epochs);
 
         // <-- Start
         loadWeightsPerformance.start();
@@ -160,6 +156,8 @@ public class LocalTrainWorker extends AbstractFLaaSWorker {
         // load weights
         String prefix = projectId + "_" + round + "_";
         File globalModelFile = new File(context.getFilesDir(), prefix + FLaaSLib.MODEL_WEIGHTS_FILENAME);
+        // TEMPORARILY skip loading if file might contain NaNs
+        // Log.d("LocalTrainWorker", "🛑 Skipping loadParameters() to avoid NaN weights");
         this.tl.loadParameters(globalModelFile);
 
         // End and report -->
@@ -204,7 +202,6 @@ public class LocalTrainWorker extends AbstractFLaaSWorker {
                         Log.e(TAG, "Not enough samples.");
                         break;
                     }
-
                     // get next
                     dataManager.next();
 

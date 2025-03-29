@@ -3,6 +3,7 @@ package org.sensingkit.flaaslib.dataset.cifar;
 import android.graphics.Bitmap;
 import android.graphics.Color;
 import android.graphics.Matrix;
+import android.util.Log;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -179,9 +180,9 @@ public class CIFAR10BatchFileParser {
     public void close() {
         try {
             inputStream.close();
-            closed = true;
+            Log.d("CIFAR10BatchFileParser", "Stream closed");
         } catch (IOException e) {
-            e.printStackTrace();
+            Log.w("CIFAR10BatchFileParser", "Failed to close stream", e);
         }
     }
 
