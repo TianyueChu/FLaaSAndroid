@@ -56,6 +56,7 @@ public class SubmitResultsWorker extends AbstractNetworkFLaaSWorker {
         int round = getInputData().getInt(KEY_ROUND_ARG, -1);
         long receivedTime = getInputData().getLong(AbstractFLaaSWorker.KEY_WORKER_SCHEDULED_TIME_ARG, -1);
         long validDate = getInputData().getLong(AbstractFLaaSWorker.KEY_REQUEST_VALID_DATE_ARG, -1);
+        // int localDP = getInputData().getInt(KEY_DP_ARG, 0);
 
         // If not valid, just return Failure (not retry)
         if (!isTaskValid(validDate)) {
@@ -113,8 +114,6 @@ public class SubmitResultsWorker extends AbstractNetworkFLaaSWorker {
     }
 
     private boolean submitWeights(Context context, int projectId, int round) {
-
-
         String prefix = projectId + "_" + round + "_";
         File globalModelFile = new File(context.getFilesDir(), prefix + FLaaSLib.MODEL_WEIGHTS_FILENAME);
         byte[] weights;

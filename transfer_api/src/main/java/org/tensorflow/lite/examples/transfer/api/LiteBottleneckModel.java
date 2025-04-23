@@ -17,6 +17,8 @@ package org.tensorflow.lite.examples.transfer.api;
 
 import java.io.Closeable;
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+
 
 /**
  * A wrapper for TFLite model that generates bottlenecks from images.
@@ -39,15 +41,18 @@ class LiteBottleneckModel implements Closeable {
   synchronized ByteBuffer generateBottleneck(ByteBuffer image, ByteBuffer outBottleneck) {
     if (outBottleneck == null) {
       outBottleneck = ByteBuffer.allocateDirect(getNumBottleneckFeatures() * FLOAT_BYTES);
+      outBottleneck.order(ByteOrder.nativeOrder());
     }
 
-    modelWrapper.getInterpreter().run(image, outBottleneck);
+    // Synchronize access to the interpreter to avoid multi-threaded issues
+    synchronized (modelWrapper) {
+      modelWrapper.getInterpreter().run(image, outBottleneck);
+    }
+
     image.rewind();
     outBottleneck.rewind();
-
     return outBottleneck;
   }
-
   int getNumBottleneckFeatures() {
     return modelWrapper.getInterpreter().getOutputTensor(0).numElements();
   }

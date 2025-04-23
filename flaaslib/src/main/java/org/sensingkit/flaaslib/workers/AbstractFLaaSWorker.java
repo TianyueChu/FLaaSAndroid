@@ -1,7 +1,6 @@
 package org.sensingkit.flaaslib.workers;
 
 import android.content.Context;
-import android.util.Log;
 
 import androidx.annotation.NonNull;
 import androidx.work.Worker;
@@ -32,7 +31,9 @@ public abstract class AbstractFLaaSWorker extends Worker {
     public static final String KEY_SEED_ARG = "SEED_ID";
     public static final String KEY_MAX_SAMPLES_ARG = "MAX_SAMPLES_ID";
     public static final String KEY_TRAINING_MODE_ARG = "TRAINING_MODE_ID";
-
+    public static final String KEY_DP_ARG = "localDP";
+    public static final String KEY_EPSILON_ARG = "EPSILON";
+    public static final String KEY_DELTA_ARG = "DELTA";
     public static final String KEY_STATS_ARG = "STATS_ID";
     public static final String KEY_APP_STATS_ARG = "APP_STATS_ID";
     public static final String KEY_DURATIONS_ARG = "DURATIONS_ID";

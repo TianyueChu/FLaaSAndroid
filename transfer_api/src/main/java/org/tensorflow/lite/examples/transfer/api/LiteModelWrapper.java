@@ -15,6 +15,10 @@ limitations under the License.
 
 package org.tensorflow.lite.examples.transfer.api;
 
+import android.util.Log;
+import java.util.Arrays;
+
+
 import java.io.Closeable;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
@@ -64,3 +68,6 @@ final class LiteModelWrapper implements Closeable {
     return result;
   }
 }
+
+
+

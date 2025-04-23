@@ -35,6 +35,8 @@ import org.sensingkit.flaaslib.enums.TrainingMode;
 import org.sensingkit.flaaslib.workers.AbstractFLaaSWorker;
 import org.sensingkit.flaaslib.workers.LocalTrainWorker;
 
+import java.util.Objects;
+
 public class MainActivity extends AppCompatActivity {
 
     @SuppressWarnings("unused")
@@ -129,6 +131,9 @@ public class MainActivity extends AppCompatActivity {
         int round = Integer.parseInt(intent.getStringExtra("round"));
         int backendRequestId = 42;
         long validDate = System.currentTimeMillis() + 10 * 60 * 1000;  // 10 mins
+        int localDP =  Integer.parseInt(intent.getStringExtra("localDP"));
+        float epsilon = Float.parseFloat(intent.getStringExtra("epsilon"));
+        float delta = Float.parseFloat(intent.getStringExtra("delta"));
 
         // prepare context
         Context context = getApplicationContext();
@@ -143,20 +148,20 @@ public class MainActivity extends AppCompatActivity {
         TrainingMode mode = TrainingMode.fromValue(trainingMode);
         switch (mode) {
             case BASELINE:
-                baselineTraining(context, backendRequestId, projectId, round, trainingMode, username, receivedTime, receivedLocalTime, validDate);
+                baselineTraining(context, backendRequestId, projectId, round, trainingMode, username, receivedTime, receivedLocalTime, validDate, localDP, epsilon,delta);
                 break;
             case JOINT_MODELS:
-                jointModelsTraining(context, backendRequestId, projectId, round, trainingMode, username, receivedTime, receivedLocalTime, validDate);
+                jointModelsTraining(context, backendRequestId, projectId, round, trainingMode, username, receivedTime, receivedLocalTime, validDate, localDP, epsilon,delta);
                 break;
             case JOINT_SAMPLES:
-                jointSamplesTraining(context, backendRequestId, projectId, round, trainingMode, username, receivedTime, receivedLocalTime, validDate);
+                jointSamplesTraining(context, backendRequestId, projectId, round, trainingMode, username, receivedTime, receivedLocalTime, validDate, localDP, epsilon,delta);
                 break;
             default:
                 Log.e(TAG, "Unknown training mode: " + mode);
         }
     }
 
-    private void baselineTraining(Context context, int backendRequestId, int projectId, int round, String trainingMode, String username, long receivedTime, long receivedLocalTime, long validDate) {
+    private void baselineTraining(Context context, int backendRequestId, int projectId, int round, String trainingMode, String username, long receivedTime, long receivedLocalTime, long validDate, int localDP, float epsilon, float delta) {
 
         // prepare data input
         Data inputData = new Data.Builder()
@@ -168,6 +173,9 @@ public class MainActivity extends AppCompatActivity {
                 .putLong(AbstractFLaaSWorker.KEY_WORKER_SCHEDULED_TIME_ARG, receivedTime)
                 .putLong(AbstractFLaaSWorker.KEY_LOCAL_TIME_ARG, receivedLocalTime)
                 .putLong(AbstractFLaaSWorker.KEY_REQUEST_VALID_DATE_ARG, validDate)
+                .putInt(AbstractFLaaSWorker.KEY_DP_ARG, localDP)
+                .putFloat(AbstractFLaaSWorker.KEY_EPSILON_ARG, epsilon)
+                .putFloat(AbstractFLaaSWorker.KEY_DELTA_ARG,delta)
                 .build();
 
         // create workers
@@ -192,7 +200,7 @@ public class MainActivity extends AppCompatActivity {
                 .enqueue();
     }
 
-    private void jointModelsTraining(Context context, int backendRequestId, int projectId, int round, String trainingMode, String username, long receivedTime, long receivedLocalTime, long validDate) {
+    private void jointModelsTraining(Context context, int backendRequestId, int projectId, int round, String trainingMode, String username, long receivedTime, long receivedLocalTime, long validDate, int localDP, float epsilon, float delta) {
 
         // prepare data input
         Data inputData = new Data.Builder()
@@ -204,6 +212,9 @@ public class MainActivity extends AppCompatActivity {
                 .putLong(AbstractFLaaSWorker.KEY_WORKER_SCHEDULED_TIME_ARG, receivedTime)
                 .putLong(AbstractFLaaSWorker.KEY_LOCAL_TIME_ARG, receivedLocalTime)
                 .putLong(AbstractFLaaSWorker.KEY_REQUEST_VALID_DATE_ARG, validDate)
+                .putInt(AbstractFLaaSWorker.KEY_DP_ARG, localDP)
+                .putFloat(AbstractFLaaSWorker.KEY_EPSILON_ARG, epsilon)
+                .putFloat(AbstractFLaaSWorker.KEY_DELTA_ARG,delta)
                 .build();
 
         // create workers
@@ -216,7 +227,7 @@ public class MainActivity extends AppCompatActivity {
         WorkManager.getInstance(context).enqueue(downloadWeightsWorker);
     }
 
-    private void jointSamplesTraining(Context context, int backendRequestId, int projectId, int round, String trainingMode, String username, long receivedTime, long receivedLocalTime, long validDate) {
+    private void jointSamplesTraining(Context context, int backendRequestId, int projectId, int round, String trainingMode, String username, long receivedTime, long receivedLocalTime, long validDate, int localDP, float epsilon, float delta) {
 
         // prepare data input
         Data inputData = new Data.Builder()
@@ -228,6 +239,9 @@ public class MainActivity extends AppCompatActivity {
                 .putLong(AbstractFLaaSWorker.KEY_WORKER_SCHEDULED_TIME_ARG, receivedTime)
                 .putLong(AbstractFLaaSWorker.KEY_LOCAL_TIME_ARG, receivedLocalTime)
                 .putLong(AbstractFLaaSWorker.KEY_REQUEST_VALID_DATE_ARG, validDate)
+                .putInt(AbstractFLaaSWorker.KEY_DP_ARG, localDP)
+                .putFloat(AbstractFLaaSWorker.KEY_EPSILON_ARG, epsilon)
+                .putFloat(AbstractFLaaSWorker.KEY_DELTA_ARG,delta)
                 .build();
 
         // create workers

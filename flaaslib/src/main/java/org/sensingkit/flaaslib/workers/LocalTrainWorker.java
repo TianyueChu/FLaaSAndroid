@@ -23,6 +23,8 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
+
 
 public class LocalTrainWorker extends AbstractFLaaSWorker {
 
@@ -52,6 +54,8 @@ public class LocalTrainWorker extends AbstractFLaaSWorker {
         // get context
         Context context = getApplicationContext();
 
+        //Log.d(TAG, "📥 Raw inputData: " + getInputData().toString());
+
         // get input data
         int backendRequestID = getInputData().getInt(KEY_BACKEND_REQUEST_ID_ARG, -1);
         int projectId = getInputData().getInt(KEY_PROJECT_ID_ARG, -1);
@@ -73,6 +77,11 @@ public class LocalTrainWorker extends AbstractFLaaSWorker {
         TrainingMode trainingMode = TrainingMode.fromValue(trainingModeString);
         long receivedTime = getInputData().getLong(AbstractFLaaSWorker.KEY_WORKER_SCHEDULED_TIME_ARG, -1);
         long validDate = getInputData().getLong(AbstractFLaaSWorker.KEY_REQUEST_VALID_DATE_ARG, -1);
+        int localDP = getInputData().getInt(AbstractFLaaSWorker.KEY_DP_ARG, 0);
+        Log.d(TAG, "📥 Local DP flag: " + localDP);
+        float epsilon = getInputData().getFloat(AbstractFLaaSWorker.KEY_EPSILON_ARG, 1.0f);
+        float delta = getInputData().getFloat(AbstractFLaaSWorker.KEY_DELTA_ARG, 1e-5f);
+
 
         // init stats
         String statsJson = getInputData().getString(KEY_STATS_ARG);
@@ -94,7 +103,7 @@ public class LocalTrainWorker extends AbstractFLaaSWorker {
 
         // init model, load weights and train
         Log.d(TAG, "Conducting training...");
-        if (!conductTraining(context, trainingMode, projectId, round, dataset, datasetType, maxSamples, model, epochs)) {
+        if (!conductTraining(context, trainingMode, projectId, round, dataset, datasetType, maxSamples, model, epochs, localDP, epsilon, delta)) {
             Log.e(TAG, "Conduct training failed.");
             return failureResult;
         }
@@ -140,7 +149,7 @@ public class LocalTrainWorker extends AbstractFLaaSWorker {
     }
 
     @SuppressWarnings("unused")
-    private boolean conductTraining(Context context, TrainingMode trainingMode, int projectId, int round, String dataset, DatasetType datasetType, int maxSamples, String model, int epochs) {
+    private boolean conductTraining(Context context, TrainingMode trainingMode, int projectId, int round, String dataset, DatasetType datasetType, int maxSamples, String model, int epochs, int localDP, float epsilon, float delta) {
 
         // performance measurement
         PerformanceCheckpoint loadWeightsPerformance = new PerformanceCheckpoint();
@@ -156,9 +165,22 @@ public class LocalTrainWorker extends AbstractFLaaSWorker {
         // load weights
         String prefix = projectId + "_" + round + "_";
         File globalModelFile = new File(context.getFilesDir(), prefix + FLaaSLib.MODEL_WEIGHTS_FILENAME);
-        // TEMPORARILY skip loading if file might contain NaNs
-        // Log.d("LocalTrainWorker", "🛑 Skipping loadParameters() to avoid NaN weights");
-        this.tl.loadParameters(globalModelFile);
+
+        final long MAX_EXPECTED_HEAD_SIZE = 3 * 1024 * 1024; // 3MB
+
+        if (!globalModelFile.exists()) {
+            Log.w(TAG, "❌ Global model file does not exist, skipping loadParameters()");
+        } else {
+            long fileSizeBytes = globalModelFile.length();
+            Log.d(TAG, "📄 Global model file size: " + fileSizeBytes + " bytes");
+
+            if (fileSizeBytes > MAX_EXPECTED_HEAD_SIZE) {
+                Log.w(TAG, "⚠️ Skipping loadParameters(): file too large. Assuming full model or invalid.");
+            } else {
+                Log.d(TAG, "📥 Loading head weights from file...");
+                this.tl.loadParameters(globalModelFile);
+            }
+        }
 
         // End and report -->
         loadWeightsPerformance.end();
@@ -267,10 +289,24 @@ public class LocalTrainWorker extends AbstractFLaaSWorker {
         }
         addJsonArray("local_training_worker", "epochs", epochsArray);
 
-
         // save weights (replace existing file)
         if (globalModelFile.exists()) //noinspection ResultOfMethodCallIgnored
             globalModelFile.delete();
+
+        if (localDP == 1) {
+            Log.d(TAG, "Applying DP to TransferLearning weights...");
+            if (epsilon <= 0 || delta <= 0 || delta >= 1) {
+                Log.e(TAG, "❌ Invalid epsilon or delta values for DP. Skipping DP noise.");
+                return false;  // Or optionally continue without DP: just skip applyDPNoise
+            }
+            // set sensitivity = 2, because the range of model parameters is in [-1,1]
+            float stddev = computeGaussianStdDev(2, epsilon, delta);
+            Log.d(TAG, "✅ Computed DP Gaussian noise stddev: " + stddev);
+            tl.applyDPNoise(stddev);
+        }
+
+
+
         tl.saveParameters(globalModelFile);
 
         // close TL
@@ -278,5 +314,10 @@ public class LocalTrainWorker extends AbstractFLaaSWorker {
         tl = null;
 
         return true;
+    }
+
+    public float computeGaussianStdDev(float sensitivity, float epsilon, float delta) {
+        double numerator = sensitivity * Math.sqrt(2 * Math.log(1.25 / delta));
+        return (float) (numerator / epsilon);
     }
 }

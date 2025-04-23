@@ -78,7 +78,6 @@ public class TransferLearning implements Closeable {
         try {
             Log.d("TransferLearning", "Starting training...");
             model.train(epochs, (epoch, loss) -> {
-                Log.d("TransferLearning", "Epoch " + epoch + " loss = " + loss);
                 if (Float.isNaN(loss) || Float.isInfinite(loss)) {
                     Log.e("TransferLearning", "Loss went bad at epoch " + epoch);
                 }
@@ -91,7 +90,6 @@ public class TransferLearning implements Closeable {
             // no-op
         }
     }
-
     /** Frees all model resources and shuts down all background threads. */
     public void close() {
         model.close();
@@ -115,13 +113,6 @@ public class TransferLearning implements Closeable {
             ScatteringByteChannel scatter = inp.getChannel();
             model.loadParameters(scatter);
             inp.close();
-            // Add this log after loading:
-            Log.d("TransferLearning", "🔍 Checking model file: " + file.getAbsolutePath() + ", exists = " + file.exists() + ", length = " + file.length());
-            // Run a dummy prediction immediately to validate weights:
-            float[] dummyInput = new float[224 * 224 * 3]; // Zero-filled array (or random values)
-            Prediction[] preds = model.predict(dummyInput);
-            Log.d("TransferLearning", "🧪 Post-load dummy prediction: class = " + preds[0].getClassName() + ", confidence = " + preds[0].getConfidence());
-
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -130,4 +121,12 @@ public class TransferLearning implements Closeable {
     public List<Float> getEpochResults() {
         return this.epochResults;
     }
+
+    public void applyDPNoise(float stddev) {
+        if (model != null) {
+            model.applyDPNoiseToWeights(stddev);
+        }
+    }
+
+
 }

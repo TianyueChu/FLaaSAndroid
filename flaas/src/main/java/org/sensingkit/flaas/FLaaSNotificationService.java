@@ -80,6 +80,11 @@ public class FLaaSNotificationService  extends NotificationServiceExtension {
         int projectId = Integer.parseInt(Objects.requireNonNull(data.get("project")));
         int round = Integer.parseInt(Objects.requireNonNull(data.get("round")));
         String trainingMode = data.get("trainingMode");
+        int localDP = Integer.parseInt(Objects.requireNonNull(data.get("localDP")));
+        float epsilon = Float.parseFloat(Objects.requireNonNull(data.get("epsilon")));
+        float delta = Float.parseFloat(Objects.requireNonNull(data.get("delta")));
+
+
 
         if (type == null) {
             Log.d(TAG, "Key 'command' cannot be null. Ignoring.");
@@ -90,7 +95,7 @@ public class FLaaSNotificationService  extends NotificationServiceExtension {
         switch (type) {
 
             case "train":
-                handleTrain(backendRequestId, projectId, round, trainingMode, validDate);
+                handleTrain(backendRequestId, projectId, round, trainingMode, validDate, localDP, epsilon, delta);
                 break;
 
             default:
@@ -98,7 +103,7 @@ public class FLaaSNotificationService  extends NotificationServiceExtension {
         }
     }
 
-    private void handleTrain(int backendRequestId, int projectId, int round, String trainingMode, long validDate) {
+    private void handleTrain(int backendRequestId, int projectId, int round, String trainingMode, long validDate, int localDP, float epsilon, float delta) {
         // Execute worker
         // info: https://developer.android.com/codelabs/android-workmanager-java
 
@@ -115,21 +120,20 @@ public class FLaaSNotificationService  extends NotificationServiceExtension {
         TrainingMode mode = TrainingMode.fromValue(trainingMode);
         switch (mode) {
             case BASELINE:
-                baselineTraining(context, backendRequestId, projectId, round, trainingMode, username, receivedTime, receivedLocalTime, validDate);
+                baselineTraining(context, backendRequestId, projectId, round, trainingMode, username, receivedTime, receivedLocalTime, validDate, localDP, epsilon, delta);
                 break;
             case JOINT_MODELS:
-                jointModelsTraining(context, backendRequestId, projectId, round, trainingMode, username, receivedTime, receivedLocalTime, validDate);
+                jointModelsTraining(context, backendRequestId, projectId, round, trainingMode, username, receivedTime, receivedLocalTime, validDate, localDP, epsilon, delta);
                 break;
             case JOINT_SAMPLES:
-                jointSamplesTraining(context, backendRequestId, projectId, round, trainingMode, username, receivedTime, receivedLocalTime, validDate);
+                jointSamplesTraining(context, backendRequestId, projectId, round, trainingMode, username, receivedTime, receivedLocalTime, validDate, localDP, epsilon, delta);
                 break;
             default:
                 Log.e(TAG, "Unknown training mode: " + mode);
         }
     }
 
-    private void baselineTraining(Context context, int backendRequestId, int projectId, int round, String trainingMode, String username, long receivedTime, long receivedLocalTime, long validDate) {
-
+    private void baselineTraining(Context context, int backendRequestId, int projectId, int round, String trainingMode, String username, long receivedTime, long receivedLocalTime, long validDate, int localDP, float epsilon, float delta) {
         // prepare data input
         Data inputData = new Data.Builder()
                 .putInt(AbstractFLaaSWorker.KEY_BACKEND_REQUEST_ID_ARG, backendRequestId)
@@ -140,6 +144,9 @@ public class FLaaSNotificationService  extends NotificationServiceExtension {
                 .putLong(AbstractFLaaSWorker.KEY_WORKER_SCHEDULED_TIME_ARG, receivedTime)
                 .putLong(AbstractFLaaSWorker.KEY_LOCAL_TIME_ARG, receivedLocalTime)
                 .putLong(AbstractFLaaSWorker.KEY_REQUEST_VALID_DATE_ARG, validDate)
+                .putInt(AbstractFLaaSWorker.KEY_DP_ARG, localDP)
+                .putFloat(AbstractFLaaSWorker.KEY_EPSILON_ARG, epsilon)
+                .putFloat(AbstractFLaaSWorker.KEY_DELTA_ARG, delta)
                 .build();
 
         // create workers
@@ -164,7 +171,7 @@ public class FLaaSNotificationService  extends NotificationServiceExtension {
                 .enqueue();
     }
 
-    private void jointModelsTraining(Context context, int backendRequestId, int projectId, int round, String trainingMode, String username, long receivedTime, long receivedLocalTime, long validDate) {
+    private void jointModelsTraining(Context context, int backendRequestId, int projectId, int round, String trainingMode, String username, long receivedTime, long receivedLocalTime, long validDate, int localDP, float epsilon, float delta) {
 
         // prepare data input
         Data inputData = new Data.Builder()
@@ -176,6 +183,9 @@ public class FLaaSNotificationService  extends NotificationServiceExtension {
                 .putLong(AbstractFLaaSWorker.KEY_WORKER_SCHEDULED_TIME_ARG, receivedTime)
                 .putLong(AbstractFLaaSWorker.KEY_LOCAL_TIME_ARG, receivedLocalTime)
                 .putLong(AbstractFLaaSWorker.KEY_REQUEST_VALID_DATE_ARG, validDate)
+                .putInt(AbstractFLaaSWorker.KEY_DP_ARG, localDP)
+                .putFloat(AbstractFLaaSWorker.KEY_EPSILON_ARG, epsilon)
+                .putFloat(AbstractFLaaSWorker.KEY_DELTA_ARG, delta)
                 .build();
 
         // create workers
@@ -188,7 +198,7 @@ public class FLaaSNotificationService  extends NotificationServiceExtension {
         WorkManager.getInstance(context).enqueue(downloadWeightsWorker);
     }
 
-    private void jointSamplesTraining(Context context, int backendRequestId, int projectId, int round, String trainingMode, String username, long receivedTime, long receivedLocalTime, long validDate) {
+    private void jointSamplesTraining(Context context, int backendRequestId, int projectId, int round, String trainingMode, String username, long receivedTime, long receivedLocalTime, long validDate, int localDP, float epsilon, float delta) {
 
         // prepare data input
         Data inputData = new Data.Builder()
@@ -200,6 +210,9 @@ public class FLaaSNotificationService  extends NotificationServiceExtension {
                 .putLong(AbstractFLaaSWorker.KEY_WORKER_SCHEDULED_TIME_ARG, receivedTime)
                 .putLong(AbstractFLaaSWorker.KEY_LOCAL_TIME_ARG, receivedLocalTime)
                 .putLong(AbstractFLaaSWorker.KEY_REQUEST_VALID_DATE_ARG, validDate)
+                .putInt(AbstractFLaaSWorker.KEY_DP_ARG, localDP)
+                .putFloat(AbstractFLaaSWorker.KEY_EPSILON_ARG, epsilon)
+                .putFloat(AbstractFLaaSWorker.KEY_DELTA_ARG, delta)
                 .build();
 
         // create workers

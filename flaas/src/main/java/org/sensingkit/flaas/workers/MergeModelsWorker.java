@@ -59,6 +59,9 @@ public class MergeModelsWorker extends AbstractNetworkFLaaSWorker {
         String[] rgbStats = getInputData().getStringArray(KEY_APP_STATS_ARG);
         long receivedTime = getInputData().getLong(AbstractFLaaSWorker.KEY_WORKER_SCHEDULED_TIME_ARG, -1);
         long validDate = getInputData().getLong(AbstractFLaaSWorker.KEY_REQUEST_VALID_DATE_ARG, -1);
+        int localDP = getInputData().getInt(KEY_DP_ARG, 0);
+        float epsilon = getInputData().getFloat(KEY_EPSILON_ARG, 1.0f);       // default = 1.0
+        float delta = getInputData().getFloat(KEY_DELTA_ARG, 1e-5f);
 
         // If not valid, just return Failure (not retry)
         if (!isTaskValid(validDate)) {
@@ -125,6 +128,9 @@ public class MergeModelsWorker extends AbstractNetworkFLaaSWorker {
                 .putLong(KEY_WORKER_SCHEDULED_TIME_ARG, System.nanoTime())
                 .putString(KEY_STATS_ARG, jsonString)
                 .putLong(KEY_REQUEST_VALID_DATE_ARG, validDate)
+                .putInt(KEY_DP_ARG, localDP)
+                .putFloat(KEY_EPSILON_ARG, epsilon)
+                .putFloat(KEY_DELTA_ARG, delta)
                 .build();
 
         return Result.success(output);

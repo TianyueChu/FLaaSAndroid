@@ -64,6 +64,10 @@ public class DownloadWeightsWorker extends AbstractNetworkFLaaSWorker {
         long validDate = getInputData().getLong(AbstractFLaaSWorker.KEY_REQUEST_VALID_DATE_ARG, -1);
         long receivedTime = getInputData().getLong(AbstractFLaaSWorker.KEY_WORKER_SCHEDULED_TIME_ARG, -1);
         long receivedLocalTime = getInputData().getLong(AbstractFLaaSWorker.KEY_LOCAL_TIME_ARG, -1);
+        int localDP = getInputData().getInt(AbstractFLaaSWorker.KEY_DP_ARG, 0);
+        float epsilon = getInputData().getFloat(AbstractFLaaSWorker.KEY_EPSILON_ARG, 1.0f);       // default = 1.0
+        float delta = getInputData().getFloat(AbstractFLaaSWorker.KEY_DELTA_ARG, 1e-5f);
+
 
         // If not valid, just return Failure (not retry)
         if (!isTaskValid(validDate)) {
@@ -196,6 +200,9 @@ public class DownloadWeightsWorker extends AbstractNetworkFLaaSWorker {
                 .putLong(KEY_WORKER_SCHEDULED_TIME_ARG, System.nanoTime())
                 .putString(KEY_STATS_ARG, jsonString)
                 .putLong(KEY_REQUEST_VALID_DATE_ARG, validDate)
+                .putInt(KEY_DP_ARG, localDP)
+                .putFloat(KEY_EPSILON_ARG,epsilon)
+                .putFloat(KEY_DELTA_ARG,delta)
                 .build();
 
         return Result.success(output);
