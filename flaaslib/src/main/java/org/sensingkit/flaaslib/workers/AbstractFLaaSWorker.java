@@ -34,6 +34,7 @@ public abstract class AbstractFLaaSWorker extends Worker {
     public static final String KEY_DP_ARG = "localDP";
     public static final String KEY_EPSILON_ARG = "EPSILON";
     public static final String KEY_DELTA_ARG = "DELTA";
+    public static final String KEY_USE_SPLIT_LEARNING = "useSplitLearning";
     public static final String KEY_STATS_ARG = "STATS_ID";
     public static final String KEY_APP_STATS_ARG = "APP_STATS_ID";
     public static final String KEY_DURATIONS_ARG = "DURATIONS_ID";

@@ -62,6 +62,9 @@ public class MergeModelsWorker extends AbstractNetworkFLaaSWorker {
         int localDP = getInputData().getInt(KEY_DP_ARG, 0);
         float epsilon = getInputData().getFloat(KEY_EPSILON_ARG, 1.0f);       // default = 1.0
         float delta = getInputData().getFloat(KEY_DELTA_ARG, 1e-5f);
+        boolean useSplitLearning = getInputData().getBoolean(KEY_USE_SPLIT_LEARNING, false);
+
+
 
         // If not valid, just return Failure (not retry)
         if (!isTaskValid(validDate)) {
@@ -131,6 +134,7 @@ public class MergeModelsWorker extends AbstractNetworkFLaaSWorker {
                 .putInt(KEY_DP_ARG, localDP)
                 .putFloat(KEY_EPSILON_ARG, epsilon)
                 .putFloat(KEY_DELTA_ARG, delta)
+                .putBoolean(KEY_USE_SPLIT_LEARNING, useSplitLearning)
                 .build();
 
         return Result.success(output);

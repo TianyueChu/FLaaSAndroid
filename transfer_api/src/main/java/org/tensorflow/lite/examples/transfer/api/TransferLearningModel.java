@@ -477,25 +477,51 @@ public final class TransferLearningModel implements Closeable {
     return trainHeadModel.getBatchSize();
   }
 
-  public void applyDPNoiseToWeights(float stddev) {
+  public void applyDPNoiseToWeights(float noiseStddev) {
     parameterLock.writeLock().lock();
     try {
-      Random random = new Random();  // You could seed this if needed
+      float targetMean = 0.0f;
+      float targetStd = 0.00034f;
+
+      List<Float> noisedWeights = new ArrayList<>();
+      Random random = new Random();
+
+      // Step 1: Add DP noise and collect
+      for (ByteBuffer buffer : modelParameters) {
+        buffer.rewind();
+        while (buffer.remaining() >= FLOAT_BYTES) {
+          float original = buffer.getFloat();
+          float noised = original + (float) random.nextGaussian() * noiseStddev;
+          noisedWeights.add(noised);
+        }
+      }
+
+      // Step 2: Compute mean and std of noised weights
+      float sum = 0f;
+      for (float w : noisedWeights) sum += w;
+      float mean = sum / noisedWeights.size();
+
+      float varianceSum = 0f;
+      for (float w : noisedWeights) varianceSum += (w - mean) * (w - mean);
+      float std = (float) Math.sqrt(varianceSum / noisedWeights.size());
+
+      // Step 3: Rescale using the computed stats
+      int idx = 0;
       for (ByteBuffer buffer : modelParameters) {
         buffer.rewind();
         for (int i = 0; i < buffer.capacity() / FLOAT_BYTES; i++) {
-          float original = buffer.getFloat();
-          float noise = (float) random.nextGaussian() * stddev;
-          float noisedValue = original + noise;
-          buffer.position(buffer.position() - FLOAT_BYTES);  // Go back to overwrite
-          buffer.putFloat(noisedValue);
+          float w = noisedWeights.get(idx++);
+          float rescaled = ((w - mean) / std) * targetStd + targetMean;
+          buffer.putFloat(rescaled);
         }
-        buffer.rewind();  // Reset for any future use
+        buffer.rewind();
       }
+
     } finally {
       parameterLock.writeLock().unlock();
     }
   }
+
 
   /**
    * Constructs an iterator that iterates over training sample batches.

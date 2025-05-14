@@ -23,7 +23,7 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Future;
+
 
 
 public class LocalTrainWorker extends AbstractFLaaSWorker {
@@ -81,6 +81,8 @@ public class LocalTrainWorker extends AbstractFLaaSWorker {
         Log.d(TAG, "📥 Local DP flag: " + localDP);
         float epsilon = getInputData().getFloat(AbstractFLaaSWorker.KEY_EPSILON_ARG, 1.0f);
         float delta = getInputData().getFloat(AbstractFLaaSWorker.KEY_DELTA_ARG, 1e-5f);
+        boolean useSplitLearning = getInputData().getBoolean(AbstractFLaaSWorker.KEY_USE_SPLIT_LEARNING, false);
+        Log.d(TAG, "🧠 Use Split Learning: " + useSplitLearning);
 
 
         // init stats
@@ -103,7 +105,7 @@ public class LocalTrainWorker extends AbstractFLaaSWorker {
 
         // init model, load weights and train
         Log.d(TAG, "Conducting training...");
-        if (!conductTraining(context, trainingMode, projectId, round, dataset, datasetType, maxSamples, model, epochs, localDP, epsilon, delta)) {
+        if (!conductTraining(context, trainingMode, projectId, round, dataset, datasetType, maxSamples, model, epochs, localDP, epsilon, delta, useSplitLearning)) {
             Log.e(TAG, "Conduct training failed.");
             return failureResult;
         }
@@ -149,7 +151,7 @@ public class LocalTrainWorker extends AbstractFLaaSWorker {
     }
 
     @SuppressWarnings("unused")
-    private boolean conductTraining(Context context, TrainingMode trainingMode, int projectId, int round, String dataset, DatasetType datasetType, int maxSamples, String model, int epochs, int localDP, float epsilon, float delta) {
+    private boolean conductTraining(Context context, TrainingMode trainingMode, int projectId, int round, String dataset, DatasetType datasetType, int maxSamples, String model, int epochs, int localDP, float epsilon, float delta, boolean useSplitLearning) {
 
         // performance measurement
         PerformanceCheckpoint loadWeightsPerformance = new PerformanceCheckpoint();
@@ -299,13 +301,11 @@ public class LocalTrainWorker extends AbstractFLaaSWorker {
                 Log.e(TAG, "❌ Invalid epsilon or delta values for DP. Skipping DP noise.");
                 return false;  // Or optionally continue without DP: just skip applyDPNoise
             }
-            // set sensitivity = 2, because the range of model parameters is in [-1,1]
-            float stddev = computeGaussianStdDev(2, epsilon, delta);
+            // set sensitivity = 1, because the range of model parameters is in [-1,1]
+            float stddev = computeGaussianStdDev(1, epsilon, delta);
             Log.d(TAG, "✅ Computed DP Gaussian noise stddev: " + stddev);
             tl.applyDPNoise(stddev);
         }
-
-
 
         tl.saveParameters(globalModelFile);
 

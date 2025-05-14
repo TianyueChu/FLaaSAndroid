@@ -165,13 +165,14 @@ public class FLaaSLibBroadcastReceiver extends AbstractBroadcastReceiver {
             int localDP = intent.getIntExtra(AbstractFLaaSWorker.KEY_DP_ARG, 0);
             float epsilon = intent.getFloatExtra(AbstractFLaaSWorker.KEY_EPSILON_ARG, 1.0f);         // Default epsilon = 1.0
             float delta = intent.getFloatExtra(AbstractFLaaSWorker.KEY_DELTA_ARG, 1e-5f);
+            boolean useSplitLearning = intent.getBooleanExtra(AbstractFLaaSWorker.KEY_USE_SPLIT_LEARNING, false);
 
             // Schedule Training
-            requestTrainAndSendWeights(context, requestID, projectId, round, trainingMode, model, username, dataset, datasetTypeString, epochs, seed, maxSamples,localDP,epsilon,delta);
+            requestTrainAndSendWeights(context, requestID, projectId, round, trainingMode, model, username, dataset, datasetTypeString, epochs, seed, maxSamples,localDP,epsilon,delta, useSplitLearning);
         }
     }
 
-    private static void requestTrainAndSendWeights(Context context, int requestId, int projectId, int round, String trainingMode, String model, String username, String dataset, String datasetType, int epochs, int seed, int maxSamples, int localDP, float epsilon, float delta) {
+    private static void requestTrainAndSendWeights(Context context, int requestId, int projectId, int round, String trainingMode, String model, String username, String dataset, String datasetType, int epochs, int seed, int maxSamples, int localDP, float epsilon, float delta, boolean useSplitLearning) {
 
         // prepare data input
         Data inputData = new Data.Builder()
@@ -189,6 +190,7 @@ public class FLaaSLibBroadcastReceiver extends AbstractBroadcastReceiver {
                 .putInt(AbstractFLaaSWorker.KEY_DP_ARG, localDP)
                 .putFloat(AbstractFLaaSWorker.KEY_EPSILON_ARG, epsilon)
                 .putFloat(AbstractFLaaSWorker.KEY_DELTA_ARG, delta)
+                .putBoolean(AbstractFLaaSWorker.KEY_USE_SPLIT_LEARNING, useSplitLearning)
                 .putLong(AbstractFLaaSWorker.KEY_WORKER_SCHEDULED_TIME_ARG, System.nanoTime())
                 .build();
 

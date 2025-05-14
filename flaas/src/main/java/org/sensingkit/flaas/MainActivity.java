@@ -134,6 +134,8 @@ public class MainActivity extends AppCompatActivity {
         int localDP =  Integer.parseInt(intent.getStringExtra("localDP"));
         float epsilon = Float.parseFloat(intent.getStringExtra("epsilon"));
         float delta = Float.parseFloat(intent.getStringExtra("delta"));
+        boolean useSplitLearning = Boolean.parseBoolean(intent.getStringExtra("useSplitLearning"));
+
 
         // prepare context
         Context context = getApplicationContext();
@@ -148,20 +150,20 @@ public class MainActivity extends AppCompatActivity {
         TrainingMode mode = TrainingMode.fromValue(trainingMode);
         switch (mode) {
             case BASELINE:
-                baselineTraining(context, backendRequestId, projectId, round, trainingMode, username, receivedTime, receivedLocalTime, validDate, localDP, epsilon,delta);
+                baselineTraining(context, backendRequestId, projectId, round, trainingMode, username, receivedTime, receivedLocalTime, validDate, localDP, epsilon,delta, useSplitLearning);
                 break;
             case JOINT_MODELS:
-                jointModelsTraining(context, backendRequestId, projectId, round, trainingMode, username, receivedTime, receivedLocalTime, validDate, localDP, epsilon,delta);
+                jointModelsTraining(context, backendRequestId, projectId, round, trainingMode, username, receivedTime, receivedLocalTime, validDate, localDP, epsilon,delta, useSplitLearning);
                 break;
             case JOINT_SAMPLES:
-                jointSamplesTraining(context, backendRequestId, projectId, round, trainingMode, username, receivedTime, receivedLocalTime, validDate, localDP, epsilon,delta);
+                jointSamplesTraining(context, backendRequestId, projectId, round, trainingMode, username, receivedTime, receivedLocalTime, validDate, localDP, epsilon,delta, useSplitLearning);
                 break;
             default:
                 Log.e(TAG, "Unknown training mode: " + mode);
         }
     }
 
-    private void baselineTraining(Context context, int backendRequestId, int projectId, int round, String trainingMode, String username, long receivedTime, long receivedLocalTime, long validDate, int localDP, float epsilon, float delta) {
+    private void baselineTraining(Context context, int backendRequestId, int projectId, int round, String trainingMode, String username, long receivedTime, long receivedLocalTime, long validDate, int localDP, float epsilon, float delta, boolean useSplitLearning) {
 
         // prepare data input
         Data inputData = new Data.Builder()
@@ -176,6 +178,7 @@ public class MainActivity extends AppCompatActivity {
                 .putInt(AbstractFLaaSWorker.KEY_DP_ARG, localDP)
                 .putFloat(AbstractFLaaSWorker.KEY_EPSILON_ARG, epsilon)
                 .putFloat(AbstractFLaaSWorker.KEY_DELTA_ARG,delta)
+                .putBoolean(AbstractFLaaSWorker.KEY_USE_SPLIT_LEARNING, useSplitLearning)
                 .build();
 
         // create workers
@@ -200,7 +203,7 @@ public class MainActivity extends AppCompatActivity {
                 .enqueue();
     }
 
-    private void jointModelsTraining(Context context, int backendRequestId, int projectId, int round, String trainingMode, String username, long receivedTime, long receivedLocalTime, long validDate, int localDP, float epsilon, float delta) {
+    private void jointModelsTraining(Context context, int backendRequestId, int projectId, int round, String trainingMode, String username, long receivedTime, long receivedLocalTime, long validDate, int localDP, float epsilon, float delta, boolean useSplitLearning) {
 
         // prepare data input
         Data inputData = new Data.Builder()
@@ -215,6 +218,7 @@ public class MainActivity extends AppCompatActivity {
                 .putInt(AbstractFLaaSWorker.KEY_DP_ARG, localDP)
                 .putFloat(AbstractFLaaSWorker.KEY_EPSILON_ARG, epsilon)
                 .putFloat(AbstractFLaaSWorker.KEY_DELTA_ARG,delta)
+                .putBoolean(AbstractFLaaSWorker.KEY_USE_SPLIT_LEARNING, useSplitLearning)
                 .build();
 
         // create workers
@@ -227,7 +231,7 @@ public class MainActivity extends AppCompatActivity {
         WorkManager.getInstance(context).enqueue(downloadWeightsWorker);
     }
 
-    private void jointSamplesTraining(Context context, int backendRequestId, int projectId, int round, String trainingMode, String username, long receivedTime, long receivedLocalTime, long validDate, int localDP, float epsilon, float delta) {
+    private void jointSamplesTraining(Context context, int backendRequestId, int projectId, int round, String trainingMode, String username, long receivedTime, long receivedLocalTime, long validDate, int localDP, float epsilon, float delta, boolean useSplitLearning) {
 
         // prepare data input
         Data inputData = new Data.Builder()
@@ -242,6 +246,7 @@ public class MainActivity extends AppCompatActivity {
                 .putInt(AbstractFLaaSWorker.KEY_DP_ARG, localDP)
                 .putFloat(AbstractFLaaSWorker.KEY_EPSILON_ARG, epsilon)
                 .putFloat(AbstractFLaaSWorker.KEY_DELTA_ARG,delta)
+                .putBoolean(AbstractFLaaSWorker.KEY_USE_SPLIT_LEARNING, useSplitLearning)
                 .build();
 
         // create workers

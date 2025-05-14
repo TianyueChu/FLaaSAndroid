@@ -83,6 +83,8 @@ public class FLaaSNotificationService  extends NotificationServiceExtension {
         int localDP = Integer.parseInt(Objects.requireNonNull(data.get("localDP")));
         float epsilon = Float.parseFloat(Objects.requireNonNull(data.get("epsilon")));
         float delta = Float.parseFloat(Objects.requireNonNull(data.get("delta")));
+        boolean useSplitLearning = Boolean.parseBoolean(Objects.requireNonNull(data.get("useSplitLearning"))
+        );
 
 
 
@@ -95,7 +97,7 @@ public class FLaaSNotificationService  extends NotificationServiceExtension {
         switch (type) {
 
             case "train":
-                handleTrain(backendRequestId, projectId, round, trainingMode, validDate, localDP, epsilon, delta);
+                handleTrain(backendRequestId, projectId, round, trainingMode, validDate, localDP, epsilon, delta, useSplitLearning);
                 break;
 
             default:
@@ -103,7 +105,7 @@ public class FLaaSNotificationService  extends NotificationServiceExtension {
         }
     }
 
-    private void handleTrain(int backendRequestId, int projectId, int round, String trainingMode, long validDate, int localDP, float epsilon, float delta) {
+    private void handleTrain(int backendRequestId, int projectId, int round, String trainingMode, long validDate, int localDP, float epsilon, float delta, boolean useSplitLearning ) {
         // Execute worker
         // info: https://developer.android.com/codelabs/android-workmanager-java
 
@@ -120,20 +122,20 @@ public class FLaaSNotificationService  extends NotificationServiceExtension {
         TrainingMode mode = TrainingMode.fromValue(trainingMode);
         switch (mode) {
             case BASELINE:
-                baselineTraining(context, backendRequestId, projectId, round, trainingMode, username, receivedTime, receivedLocalTime, validDate, localDP, epsilon, delta);
+                baselineTraining(context, backendRequestId, projectId, round, trainingMode, username, receivedTime, receivedLocalTime, validDate, localDP, epsilon, delta, useSplitLearning);
                 break;
             case JOINT_MODELS:
-                jointModelsTraining(context, backendRequestId, projectId, round, trainingMode, username, receivedTime, receivedLocalTime, validDate, localDP, epsilon, delta);
+                jointModelsTraining(context, backendRequestId, projectId, round, trainingMode, username, receivedTime, receivedLocalTime, validDate, localDP, epsilon, delta, useSplitLearning);
                 break;
             case JOINT_SAMPLES:
-                jointSamplesTraining(context, backendRequestId, projectId, round, trainingMode, username, receivedTime, receivedLocalTime, validDate, localDP, epsilon, delta);
+                jointSamplesTraining(context, backendRequestId, projectId, round, trainingMode, username, receivedTime, receivedLocalTime, validDate, localDP, epsilon, delta, useSplitLearning);
                 break;
             default:
                 Log.e(TAG, "Unknown training mode: " + mode);
         }
     }
 
-    private void baselineTraining(Context context, int backendRequestId, int projectId, int round, String trainingMode, String username, long receivedTime, long receivedLocalTime, long validDate, int localDP, float epsilon, float delta) {
+    private void baselineTraining(Context context, int backendRequestId, int projectId, int round, String trainingMode, String username, long receivedTime, long receivedLocalTime, long validDate, int localDP, float epsilon, float delta, boolean useSplitLearning ) {
         // prepare data input
         Data inputData = new Data.Builder()
                 .putInt(AbstractFLaaSWorker.KEY_BACKEND_REQUEST_ID_ARG, backendRequestId)
@@ -147,6 +149,7 @@ public class FLaaSNotificationService  extends NotificationServiceExtension {
                 .putInt(AbstractFLaaSWorker.KEY_DP_ARG, localDP)
                 .putFloat(AbstractFLaaSWorker.KEY_EPSILON_ARG, epsilon)
                 .putFloat(AbstractFLaaSWorker.KEY_DELTA_ARG, delta)
+                .putBoolean(AbstractFLaaSWorker.KEY_USE_SPLIT_LEARNING, useSplitLearning)
                 .build();
 
         // create workers
@@ -171,7 +174,7 @@ public class FLaaSNotificationService  extends NotificationServiceExtension {
                 .enqueue();
     }
 
-    private void jointModelsTraining(Context context, int backendRequestId, int projectId, int round, String trainingMode, String username, long receivedTime, long receivedLocalTime, long validDate, int localDP, float epsilon, float delta) {
+    private void jointModelsTraining(Context context, int backendRequestId, int projectId, int round, String trainingMode, String username, long receivedTime, long receivedLocalTime, long validDate, int localDP, float epsilon, float delta, boolean useSplitLearning) {
 
         // prepare data input
         Data inputData = new Data.Builder()
@@ -186,6 +189,7 @@ public class FLaaSNotificationService  extends NotificationServiceExtension {
                 .putInt(AbstractFLaaSWorker.KEY_DP_ARG, localDP)
                 .putFloat(AbstractFLaaSWorker.KEY_EPSILON_ARG, epsilon)
                 .putFloat(AbstractFLaaSWorker.KEY_DELTA_ARG, delta)
+                .putBoolean(AbstractFLaaSWorker.KEY_USE_SPLIT_LEARNING, useSplitLearning)
                 .build();
 
         // create workers
@@ -198,7 +202,7 @@ public class FLaaSNotificationService  extends NotificationServiceExtension {
         WorkManager.getInstance(context).enqueue(downloadWeightsWorker);
     }
 
-    private void jointSamplesTraining(Context context, int backendRequestId, int projectId, int round, String trainingMode, String username, long receivedTime, long receivedLocalTime, long validDate, int localDP, float epsilon, float delta) {
+    private void jointSamplesTraining(Context context, int backendRequestId, int projectId, int round, String trainingMode, String username, long receivedTime, long receivedLocalTime, long validDate, int localDP, float epsilon, float delta, boolean useSplitLearning) {
 
         // prepare data input
         Data inputData = new Data.Builder()
@@ -213,6 +217,7 @@ public class FLaaSNotificationService  extends NotificationServiceExtension {
                 .putInt(AbstractFLaaSWorker.KEY_DP_ARG, localDP)
                 .putFloat(AbstractFLaaSWorker.KEY_EPSILON_ARG, epsilon)
                 .putFloat(AbstractFLaaSWorker.KEY_DELTA_ARG, delta)
+                .putBoolean(AbstractFLaaSWorker.KEY_USE_SPLIT_LEARNING, useSplitLearning)
                 .build();
 
         // create workers
