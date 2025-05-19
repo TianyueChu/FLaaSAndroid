@@ -90,6 +90,25 @@ public class TransferLearning implements Closeable {
             // no-op
         }
     }
+
+    /**
+     * Start SL training the model continuously for 1 epoch
+     */
+    public void startSLTraining() {
+        try {
+            Log.d("TransferLearning", "📦 Starting SL forward-pass preparation...");
+            model.SLtrain().get();
+            Log.d("TransferLearning", "✅ SL batch ready.");
+        } catch (ExecutionException e) {
+            throw new RuntimeException("❌ Exception occurred during SL preparation", e.getCause());
+        } catch (InterruptedException e) {
+            // Thread was interrupted—handle gracefully if needed
+            Thread.currentThread().interrupt();
+            Log.e("TransferLearning", "⚠️ SL training interrupted");
+        }
+    }
+
+
     /** Frees all model resources and shuts down all background threads. */
     public void close() {
         model.close();
@@ -106,6 +125,19 @@ public class TransferLearning implements Closeable {
             e.printStackTrace();
         }
     }
+
+    public void saveSLParameters(File file) {
+        try {
+            FileOutputStream out = new FileOutputStream(file);
+            GatheringByteChannel gather = out.getChannel();
+            model.saveSLParameters(gather);  // Calls the method you already implemented
+            out.close();
+        } catch (IOException e) {
+            Log.e("TransferLearningModel", "❌ Failed to save SL parameters", e);
+            e.printStackTrace();
+        }
+    }
+
 
     public void loadParameters(File file) {
         try {

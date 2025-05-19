@@ -262,57 +262,77 @@ public class LocalTrainWorker extends AbstractFLaaSWorker {
         trainPerformance.start();
 
         // Train
-        tl.startTraining();
+        if (useSplitLearning) {
+            tl.startSLTraining();
+            // End and report -->
+            trainPerformance.end();
+            addProperty("local_training_worker", "training_duration", trainPerformance.getDuration());
 
-        // End and report -->
-        trainPerformance.end();
-        addProperty("local_training_worker", "training_duration", trainPerformance.getDuration());
+            // delete the received samples
+            PersistentStore.clearAllSamples(context, projectId, round, datasetType);
 
-        // delete the received samples
-        PersistentStore.clearAllSamples(context, projectId, round, datasetType);
+            // save weights (replace existing file)
+            if (globalModelFile.exists()) //noinspection ResultOfMethodCallIgnored
+                globalModelFile.delete();
 
-        // Get training results
-        List<Float> epochResults = tl.getEpochResults();
+            tl.saveSLParameters(globalModelFile);
 
-        // Check for NaN losses
-        for (int i = 0; i < epochResults.size(); i++) {
-            Float loss = epochResults.get(i);
-            if (loss == null || Float.isNaN(loss)) {
-                Log.w(TAG, "Epoch " + i + " produced NaN or null. Training failed.");
-                return false;
+            // close TL
+            tl.close();
+            tl = null;
+
+
+        } else {
+            tl.startTraining();
+            // End and report -->
+            trainPerformance.end();
+            addProperty("local_training_worker", "training_duration", trainPerformance.getDuration());
+
+            // delete the received samples
+            PersistentStore.clearAllSamples(context, projectId, round, datasetType);
+
+            // Get training results
+            List<Float> epochResults = tl.getEpochResults();
+
+            // Check for NaN losses
+            for (int i = 0; i < epochResults.size(); i++) {
+                Float loss = epochResults.get(i);
+                if (loss == null || Float.isNaN(loss)) {
+                    Log.w(TAG, "Epoch " + i + " produced NaN or null. Training failed.");
+                    return false;
+                }
             }
-        }
 
-        // Add training epochs in performance results
-        JsonArray epochsArray = new JsonArray(epochResults.size());
-        // JsonArray epochsArray = new JsonArray(epochs);
-        for (Float epoch : epochResults) {
-            epochsArray.add(epoch);
-        }
-        addJsonArray("local_training_worker", "epochs", epochsArray);
-
-        // save weights (replace existing file)
-        if (globalModelFile.exists()) //noinspection ResultOfMethodCallIgnored
-            globalModelFile.delete();
-
-        if (localDP == 1) {
-            Log.d(TAG, "Applying DP to TransferLearning weights...");
-            if (epsilon <= 0 || delta <= 0 || delta >= 1) {
-                Log.e(TAG, "❌ Invalid epsilon or delta values for DP. Skipping DP noise.");
-                return false;  // Or optionally continue without DP: just skip applyDPNoise
+            // Add training epochs in performance results
+            JsonArray epochsArray = new JsonArray(epochResults.size());
+            // JsonArray epochsArray = new JsonArray(epochs);
+            for (Float epoch : epochResults) {
+                epochsArray.add(epoch);
             }
-            // set sensitivity = 1, because the range of model parameters is in [-1,1]
-            float stddev = computeGaussianStdDev(1, epsilon, delta);
-            Log.d(TAG, "✅ Computed DP Gaussian noise stddev: " + stddev);
-            tl.applyDPNoise(stddev);
+            addJsonArray("local_training_worker", "epochs", epochsArray);
+
+            // save weights (replace existing file)
+            if (globalModelFile.exists()) //noinspection ResultOfMethodCallIgnored
+                globalModelFile.delete();
+
+            if (localDP == 1) {
+                Log.d(TAG, "Applying DP to TransferLearning weights...");
+                if (epsilon <= 0 || delta <= 0 || delta >= 1) {
+                    Log.e(TAG, "❌ Invalid epsilon or delta values for DP. Skipping DP noise.");
+                    return false;  // Or optionally continue without DP: just skip applyDPNoise
+                }
+                // set sensitivity = 1, because the range of model parameters is in [-1,1]
+                float stddev = computeGaussianStdDev(1, epsilon, delta);
+                Log.d(TAG, "✅ Computed DP Gaussian noise stddev: " + stddev);
+                tl.applyDPNoise(stddev);
+            }
+
+            tl.saveParameters(globalModelFile);
+
+            // close TL
+            tl.close();
+            tl = null;
         }
-
-        tl.saveParameters(globalModelFile);
-
-        // close TL
-        tl.close();
-        tl = null;
-
         return true;
     }
 

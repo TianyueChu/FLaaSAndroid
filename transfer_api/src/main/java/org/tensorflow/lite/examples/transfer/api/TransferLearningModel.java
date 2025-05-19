@@ -365,6 +365,64 @@ public final class TransferLearningModel implements Closeable {
   }
 
   /**
+   * Trains the model using SL on the previously added data samples.
+   * only 1 local epoch
+   *
+   * @return future that is resolved when training is finished.
+   */
+  public Future<Void> SLtrain() {
+    checkNotTerminating();
+
+    Log.d("TransferLearningModel", "🚀 Entered SLtrain()");
+
+    if (trainingSamples.size() < getTrainBatchSize()) {
+      Log.d("TransferLearningModel", "📦 trainingSamples = " + trainingSamples.size() + ", batchSize = " + getTrainBatchSize());
+
+      throw new RuntimeException(
+              String.format(
+                      "Too few samples to prepare SL batch: need %d, got %d",
+                      getTrainBatchSize(), trainingSamples.size()));
+    }
+
+    return executor.submit(() -> {
+      trainingLock.lock();
+      Log.d("TransferLearningModel", "🔒 Acquired training lock for SL preparation.");
+      try {
+        List<TrainingSample> batch = trainingBatches().iterator().next();
+
+        trainingBatchClasses.put(zeroBatchClasses);
+        trainingBatchClasses.rewind();
+        zeroBatchClasses.rewind();
+
+        trainingBatchBottlenecks.clear();
+
+        for (int sampleIdx = 0; sampleIdx < batch.size(); sampleIdx++) {
+          TrainingSample sample = batch.get(sampleIdx);
+          trainingBatchBottlenecks.put(sample.bottleneck);
+          sample.bottleneck.rewind();
+
+          // Fill one-hot class labels
+          int position =
+                  (sampleIdx * classes.size() + classes.get(sample.className)) * FLOAT_BYTES;
+          trainingBatchClasses.putFloat(position, 1);
+        }
+
+        trainingBatchBottlenecks.rewind();
+        trainingBatchClasses.rewind();
+
+        Log.d("TransferLearningModel", "✅ SL batch prepared successfully.");
+        return null;
+      } catch (Exception e) {
+        Log.e("TransferLearningModel", "🔥 Exception in SLtrain: " + e.getMessage(), e);
+        throw e;
+      } finally {
+        trainingLock.unlock();
+      }
+    });
+  }
+
+
+  /**
    * Runs model inference on a given image.
    * @param image image RGB data.
    * @return predictions sorted by confidence decreasing. Can be null if model is terminating.
@@ -432,6 +490,18 @@ public final class TransferLearningModel implements Closeable {
       parameterLock.readLock().unlock();
     }
   }
+
+  public void saveSLParameters(GatheringByteChannel outputChannel) throws IOException {
+    trainingLock.lock(); // Optional: use lock if SL training is concurrent
+    try {
+      trainingBatchBottlenecks.rewind();
+      trainingBatchClasses.rewind();
+      outputChannel.write(new ByteBuffer[] { trainingBatchBottlenecks, trainingBatchClasses });
+    } finally {
+      trainingLock.unlock();
+    }
+  }
+
 
   /**
    * Overwrites the current model parameter values with the values read from a channel.
