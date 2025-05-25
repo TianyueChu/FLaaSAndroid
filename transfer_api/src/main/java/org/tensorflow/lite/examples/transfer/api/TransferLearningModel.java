@@ -21,6 +21,7 @@ import java.io.Closeable;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.nio.FloatBuffer;
 import java.nio.channels.GatheringByteChannel;
 import java.nio.channels.ScatteringByteChannel;
 import java.util.ArrayList;
@@ -118,6 +119,10 @@ public final class TransferLearningModel implements Closeable {
   private final ByteBuffer trainingBatchBottlenecks;
   private final ByteBuffer trainingBatchClasses;
 
+  // Where to store whole training inputs.
+  private ByteBuffer fullTrainBottlenecks;
+  private ByteBuffer fullTrainClasses;
+
   // A zero-filled buffer of the same size as `trainingBatchClasses`.
   private final ByteBuffer zeroBatchClasses;
 
@@ -205,7 +210,6 @@ public final class TransferLearningModel implements Closeable {
       zeroBatchClasses.putFloat(0);
     }
     zeroBatchClasses.rewind();
-
     inferenceBottleneck = allocateBuffer(numBottleneckFeatures() * FLOAT_BYTES);
   }
 
@@ -377,10 +381,8 @@ public final class TransferLearningModel implements Closeable {
 
     if (trainingSamples.size() < getTrainBatchSize()) {
       Log.d("TransferLearningModel", "📦 trainingSamples = " + trainingSamples.size() + ", batchSize = " + getTrainBatchSize());
-
       throw new RuntimeException(
-              String.format(
-                      "Too few samples to prepare SL batch: need %d, got %d",
+              String.format("Too few samples to prepare SL batch: need %d, got %d",
                       getTrainBatchSize(), trainingSamples.size()));
     }
 
@@ -388,33 +390,57 @@ public final class TransferLearningModel implements Closeable {
       trainingLock.lock();
       Log.d("TransferLearningModel", "🔒 Acquired training lock for SL preparation.");
       try {
-        List<TrainingSample> batch = trainingBatches().iterator().next();
+        //Cap the sample size to avoid memory overload
+        final int MAX_SL_SAMPLES = 200;  // Safe default for Android
+        int totalSamples = trainingSamples.size();
+        List<TrainingSample> limitedSamples = trainingSamples.subList(0, Math.min(totalSamples, MAX_SL_SAMPLES));
+        int numSamples = limitedSamples.size();  // Always use this!
 
-        trainingBatchClasses.put(zeroBatchClasses);
-        trainingBatchClasses.rewind();
-        zeroBatchClasses.rewind();
+        Log.d("TransferLearningModel", "SL DEBUG — Allocating with numSamples = " + numSamples);
 
-        trainingBatchBottlenecks.clear();
+        //  Compute buffer sizes
+        int bottleneckDim = numBottleneckFeatures(); //
+        int numClasses = classes.size();
 
-        for (int sampleIdx = 0; sampleIdx < batch.size(); sampleIdx++) {
-          TrainingSample sample = batch.get(sampleIdx);
-          trainingBatchBottlenecks.put(sample.bottleneck);
+        int bottleneckBytes = numSamples * bottleneckDim * FLOAT_BYTES;
+        int classBytes = numSamples * numClasses * FLOAT_BYTES;
+
+        Log.d("TransferLearningModel", "📏 SLtrain: Allocating " + (bottleneckBytes / (1024 * 1024)) + " MB for bottlenecks");
+        Log.d("TransferLearningModel", "📏 SLtrain: Allocating " + (classBytes / (1024 * 1024)) + " MB for class labels");
+
+        // Step 3: Allocate buffers
+        fullTrainBottlenecks = allocateBuffer(bottleneckBytes);
+        fullTrainClasses = allocateBuffer(classBytes);
+
+        // Step 4: Zero out class buffer
+        for (int i = 0; i < numSamples * numClasses; i++) {
+          fullTrainClasses.putFloat(0);
+        }
+        fullTrainClasses.rewind();
+
+        // Step 5: Write bottlenecks and labels
+        for (int i = 0; i < numSamples; i++) {
+          TrainingSample sample = limitedSamples.get(i);
+
+          fullTrainBottlenecks.put(sample.bottleneck);
           sample.bottleneck.rewind();
 
-          // Fill one-hot class labels
-          int position =
-                  (sampleIdx * classes.size() + classes.get(sample.className)) * FLOAT_BYTES;
-          trainingBatchClasses.putFloat(position, 1);
+          int classIdx = classes.get(sample.className);
+          int labelOffset = (i * numClasses + classIdx) * FLOAT_BYTES;
+          fullTrainClasses.putFloat(labelOffset, 1);
         }
 
-        trainingBatchBottlenecks.rewind();
-        trainingBatchClasses.rewind();
+        // Step 6: Rewind for saving
+        fullTrainBottlenecks.rewind();
+        fullTrainClasses.rewind();
 
-        Log.d("TransferLearningModel", "✅ SL batch prepared successfully.");
+        // Step 7: Final confirmation logs
+        Log.d("TransferLearningModel", "SL shape: bottlenecks = [" + numSamples + ", " + bottleneckDim + "], labels = [" + numSamples + ", " + numClasses + "]");
+
         return null;
       } catch (Exception e) {
-        Log.e("TransferLearningModel", "🔥 Exception in SLtrain: " + e.getMessage(), e);
-        throw e;
+        Log.e("TransferLearningModel", "Exception in SLtrain: " + e.getMessage(), e);
+        throw new RuntimeException("❌ Exception occurred during SL preparation", e);
       } finally {
         trainingLock.unlock();
       }
@@ -492,15 +518,60 @@ public final class TransferLearningModel implements Closeable {
   }
 
   public void saveSLParameters(GatheringByteChannel outputChannel) throws IOException {
-    trainingLock.lock(); // Optional: use lock if SL training is concurrent
+    trainingLock.lock(); // Ensure exclusive access to SL buffers
     try {
-      trainingBatchBottlenecks.rewind();
-      trainingBatchClasses.rewind();
-      outputChannel.write(new ByteBuffer[] { trainingBatchBottlenecks, trainingBatchClasses });
+      if (fullTrainBottlenecks == null || fullTrainClasses == null) {
+        throw new IllegalStateException("SL buffers are not initialized. Did you run SLtrain()?");
+      }
+
+      fullTrainBottlenecks.rewind();
+      fullTrainClasses.rewind();
+
+      int bottleneckBytes = fullTrainBottlenecks.capacity();
+      int classBytes = fullTrainClasses.capacity();
+
+      int bottleneckFloats = bottleneckBytes / FLOAT_BYTES;
+      int classFloats = classBytes / FLOAT_BYTES;
+
+      int bottleneckDim = numBottleneckFeatures();
+      int numClasses = classes.size();
+      int numSamples = bottleneckFloats / bottleneckDim;
+
+      // Log detailed shape and size information
+//      Log.d("TransferLearningModel", "SL Save - Bottleneck size (bytes): " + bottleneckBytes + " (" + bottleneckFloats + " floats)");
+//      Log.d("TransferLearningModel", "SL Save - Class labels size (bytes): " + classBytes + " (" + classFloats + " floats)");
+//      Log.d("TransferLearningModel", "SL Save - Bottleneck shape: [" + numSamples + ", " + bottleneckDim + "]");
+//      Log.d("TransferLearningModel", "SL Save - Label shape: [" + numSamples + ", " + numClasses + "]");
+//
+//      // Log a preview of values
+//      FloatBuffer bottleneckView = fullTrainBottlenecks.asFloatBuffer();
+//      FloatBuffer labelView = fullTrainClasses.asFloatBuffer();
+//
+//      StringBuilder bottleneckPreview = new StringBuilder("🔍 Bottleneck values: ");
+//      for (int i = 0; i < Math.min(5, bottleneckView.capacity()); i++) {
+//        bottleneckPreview.append(bottleneckView.get(i)).append(" ");
+//      }
+//      Log.d("TransferLearningModel", bottleneckPreview.toString());
+//
+//      StringBuilder labelPreview = new StringBuilder("🔍 Label values: ");
+//      for (int i = 0; i < Math.min(10, labelView.capacity()); i++) {
+//        labelPreview.append(labelView.get(i)).append(" ");
+//      }
+//      Log.d("TransferLearningModel", labelPreview.toString());
+
+      // Write the two buffers in sequence
+      outputChannel.write(new ByteBuffer[] {
+              fullTrainBottlenecks,
+              fullTrainClasses
+      });
+
+      // Log.d("TransferLearningModel", "✅ Finished writing SL parameters to output channel.");
+
     } finally {
       trainingLock.unlock();
     }
   }
+
 
 
   /**

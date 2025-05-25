@@ -98,7 +98,7 @@ public class TransferLearning implements Closeable {
         try {
             Log.d("TransferLearning", "📦 Starting SL forward-pass preparation...");
             model.SLtrain().get();
-            Log.d("TransferLearning", "✅ SL batch ready.");
+            Log.d("TransferLearning", "✅ SL data ready.");
         } catch (ExecutionException e) {
             throw new RuntimeException("❌ Exception occurred during SL preparation", e.getCause());
         } catch (InterruptedException e) {
