@@ -288,6 +288,8 @@ public final class TransferLearningModel implements Closeable {
             for (int epoch = 0; epoch < numEpochs; epoch++) {
               float totalLoss = 0;
               int numBatchesProcessed = 0;
+              int totalCorrect = 0;
+              int totalSamples = 0;
 
               for (List<TrainingSample> batch : trainingBatches()) {
                 if (Thread.interrupted()) {
@@ -309,6 +311,30 @@ public final class TransferLearningModel implements Closeable {
                   trainingBatchClasses.putFloat(position, 1);
                 }
                 trainingBatchBottlenecks.rewind();
+
+
+                // training accuracy
+                for (int sampleIdx = 0; sampleIdx < batch.size(); sampleIdx++) {
+                  TrainingSample sample = batch.get(sampleIdx);
+
+                  float[] logits = inferenceModel.runInference(sample.bottleneck, modelParameters);
+
+                  int predictedClass = -1;
+                  float maxVal = Float.NEGATIVE_INFINITY;
+
+                  for (int classIdx = 0; classIdx < logits.length; classIdx++) {
+                    if (logits[classIdx] > maxVal) {
+                      maxVal = logits[classIdx];
+                      predictedClass = classIdx;
+                    }
+                  }
+
+                  int trueClassIdx = classes.get(sample.className);
+                  if (predictedClass == trueClassIdx) {
+                    totalCorrect++;
+                  }
+                  totalSamples++;
+                }
 
                 float loss =
                     trainHeadModel.calculateGradients(
@@ -350,13 +376,15 @@ public final class TransferLearningModel implements Closeable {
               }
 
               float avgLoss = totalLoss / numBatchesProcessed;
-              Log.d("TransferLearningModel", "📊 Epoch " + epoch + " average loss = " + avgLoss);  // << add this
+              float accuracy = (float) totalCorrect / totalSamples;
+
+              Log.d("TransferLearningModel", "📊 Epoch " + epoch + " average loss = " + avgLoss);
+              Log.d("TransferLearningModel", "📈 Epoch " + epoch + " training accuracy = " + accuracy);
 
               if (lossConsumer != null) {
                 lossConsumer.onLoss(epoch, avgLoss);
               }
             }
-
             return null;
           }
           catch (Exception e) {
@@ -391,7 +419,7 @@ public final class TransferLearningModel implements Closeable {
       Log.d("TransferLearningModel", "🔒 Acquired training lock for SL preparation.");
       try {
         //Cap the sample size to avoid memory overload
-        final int MAX_SL_SAMPLES = 200;  // Safe default for Android
+        final int MAX_SL_SAMPLES = 150;  // TBD: set it as the Number of samples as defined in the server
         int totalSamples = trainingSamples.size();
         List<TrainingSample> limitedSamples = trainingSamples.subList(0, Math.min(totalSamples, MAX_SL_SAMPLES));
         int numSamples = limitedSamples.size();  // Always use this!

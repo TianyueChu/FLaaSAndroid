@@ -18,6 +18,7 @@ package org.tensorflow.lite.examples.transfer.api;
 import java.io.Closeable;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.TreeMap;
 import org.tensorflow.lite.Interpreter;
