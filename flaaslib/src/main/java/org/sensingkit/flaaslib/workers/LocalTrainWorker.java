@@ -54,7 +54,7 @@ public class LocalTrainWorker extends AbstractFLaaSWorker {
         // get context
         Context context = getApplicationContext();
 
-        //Log.d(TAG, "📥 Raw inputData: " + getInputData().toString());
+        //Log.d(TAG, "Raw inputData: " + getInputData().toString());
 
         // get input data
         int backendRequestID = getInputData().getInt(KEY_BACKEND_REQUEST_ID_ARG, -1);
@@ -78,11 +78,11 @@ public class LocalTrainWorker extends AbstractFLaaSWorker {
         long receivedTime = getInputData().getLong(AbstractFLaaSWorker.KEY_WORKER_SCHEDULED_TIME_ARG, -1);
         long validDate = getInputData().getLong(AbstractFLaaSWorker.KEY_REQUEST_VALID_DATE_ARG, -1);
         int localDP = getInputData().getInt(AbstractFLaaSWorker.KEY_DP_ARG, 0);
-        Log.d(TAG, "📥 Local DP flag: " + localDP);
+        Log.d(TAG, "Local DP flag: " + localDP);
         float epsilon = getInputData().getFloat(AbstractFLaaSWorker.KEY_EPSILON_ARG, 1.0f);
         float delta = getInputData().getFloat(AbstractFLaaSWorker.KEY_DELTA_ARG, 1e-5f);
         boolean useSplitLearning = getInputData().getBoolean(AbstractFLaaSWorker.KEY_USE_SPLIT_LEARNING, false);
-        Log.d(TAG, "🧠 Use Split Learning: " + useSplitLearning);
+        Log.d(TAG, "Use Split Learning: " + useSplitLearning);
 
 
         // init stats

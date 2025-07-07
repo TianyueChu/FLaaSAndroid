@@ -268,7 +268,7 @@ public final class TransferLearningModel implements Closeable {
   public Future<Void> train(int numEpochs, LossConsumer lossConsumer) {
     checkNotTerminating();
 
-    Log.d("TransferLearningModel", "🚀 Entered train() with epochs = " + numEpochs);
+    Log.d("TransferLearningModel", "Entered train() with epochs = " + numEpochs);
 
     if (trainingSamples.size() < getTrainBatchSize()) {
       Log.d("TransferLearningModel", "📦 trainingSamples = " + trainingSamples.size() + ", batchSize = " + getTrainBatchSize());
@@ -650,7 +650,7 @@ public final class TransferLearningModel implements Closeable {
     parameterLock.writeLock().lock();
     try {
       float targetMean = 0.0f;
-      float targetStd = 0.00034f;
+      float targetStd = 0.001f;
 
       List<Float> noisedWeights = new ArrayList<>();
       Random random = new Random();
