@@ -20,7 +20,7 @@ import retrofit2.http.Query;
 
 public interface APIService {
     String PRODUCTION_URL = "https://flaas.sensingkit.org";
-    String LOCAL_DEPLOYMENT_URL = "http:/10.0.2.2:8000";
+    String LOCAL_DEPLOYMENT_URL = "http://10.0.2.2:8000";
     String URL = LOCAL_DEPLOYMENT_URL; // Local deployment
 
     @GET("/api/project")

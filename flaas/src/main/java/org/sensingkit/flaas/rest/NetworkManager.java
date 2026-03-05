@@ -161,9 +161,10 @@ public class NetworkManager {
     private OkHttpClient provideOkHttpClient() {
         OkHttpClient.Builder okhttpClientBuilder = new OkHttpClient.Builder();
         okhttpClientBuilder.followRedirects(true);
-        okhttpClientBuilder.connectTimeout(30, TimeUnit.SECONDS);
-        okhttpClientBuilder.readTimeout(2, TimeUnit.MINUTES);
-        okhttpClientBuilder.writeTimeout(2, TimeUnit.MINUTES);
+        okhttpClientBuilder.connectTimeout(60, TimeUnit.SECONDS);
+        okhttpClientBuilder.readTimeout(5, TimeUnit.MINUTES);
+        okhttpClientBuilder.writeTimeout(5, TimeUnit.MINUTES);
+        okhttpClientBuilder.retryOnConnectionFailure(true);
         okhttpClientBuilder.addInterceptor(new AuthInterceptor(getSession()));
         okhttpClientBuilder.addInterceptor(new TokenRenewInterceptor(getSession(), this));
         return okhttpClientBuilder.build();
