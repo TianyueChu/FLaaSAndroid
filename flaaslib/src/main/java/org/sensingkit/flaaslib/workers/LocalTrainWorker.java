@@ -11,6 +11,7 @@ import com.google.gson.JsonArray;
 
 import org.sensingkit.flaaslib.FLaaSLib;
 import org.sensingkit.flaaslib.dataset.cifar.CIFAR10BatchFileParser;
+import org.sensingkit.flaaslib.dataset.mfcc.MFCCBatchFileParser;
 import org.sensingkit.flaaslib.enums.App;
 import org.sensingkit.flaaslib.enums.DatasetType;
 import org.sensingkit.flaaslib.enums.TrainingMode;
@@ -158,8 +159,16 @@ public class LocalTrainWorker extends AbstractFLaaSWorker {
         PerformanceCheckpoint loadSamplesPerformance = new PerformanceCheckpoint();
         PerformanceCheckpoint trainPerformance = new PerformanceCheckpoint();
 
+        boolean useMFCCParser = "MobileNet".equalsIgnoreCase(model);
+        Log.w(TAG, "Using " + (useMFCCParser ? "MFCCBatchFileParser" : "CIFAR10BatchFileParser") + " based on model: " + model);
+
         // init model
-        this.tl = new TransferLearning(context, model, Arrays.asList(CIFAR10BatchFileParser.getClasses()), epochs);
+        this.tl = new TransferLearning(
+            context,
+            model,
+            Arrays.asList(useMFCCParser ? MFCCBatchFileParser.getClasses() : CIFAR10BatchFileParser.getClasses()),
+            epochs
+        );
 
         // <-- Start
         loadWeightsPerformance.start();
@@ -215,39 +224,75 @@ public class LocalTrainWorker extends AbstractFLaaSWorker {
 
         // load samples from filenames
         for (File samplesFile : sampleFiles) {
-            // CIFAR10BatchFileParser dataManager;
-            CIFAR10BatchFileParser dataManager = null;
-            try {
-                dataManager = new CIFAR10BatchFileParser(samplesFile, 0, 224);
+            if (useMFCCParser) {
+                MFCCBatchFileParser dataManager = null;
+                try {
+                    dataManager = new MFCCBatchFileParser(samplesFile, 0, 224);
 
-               // add samples
-                for (int i = 0; i < maxSamples; i++) {
-                    if (!dataManager.hasNext()) {
-                        Log.e(TAG, "Not enough samples.");
-                        break;
+                    // add samples
+                    for (int i = 0; i < maxSamples; i++) {
+                        if (!dataManager.hasNext()) {
+                            Log.e(TAG, "Not enough samples.");
+                            break;
+                        }
+                        // get next
+                        dataManager.next();
+
+                        // get data
+                        float[] data = dataManager.getData(random.nextBoolean());
+                        int label = dataManager.getLabel();
+
+                        try {
+                            tl.addSample(data, MFCCBatchFileParser.getClass(label)).get();
+                        } catch (ExecutionException | InterruptedException e) {
+                            e.printStackTrace();
+                            return false;
+                        }
                     }
-                    // get next
-                    dataManager.next();
 
-                    // get data
-                    float[] data = dataManager.getData(random.nextBoolean());
-                    int label = dataManager.getLabel();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                    return false;
 
-                    try {
-                        tl.addSample(data, CIFAR10BatchFileParser.getClass(label)).get();
-                    } catch (ExecutionException | InterruptedException e) {
-                        e.printStackTrace();
-                        return false;
+                } finally {
+                    if (dataManager != null) {
+                        dataManager.close(); // ensure closure even on failure
                     }
                 }
+            } else {
+                CIFAR10BatchFileParser dataManager = null;
+                try {
+                    dataManager = new CIFAR10BatchFileParser(samplesFile, 0, 224);
 
-            } catch (IOException e) {
-                e.printStackTrace();
-                return false;
+                    // add samples
+                    for (int i = 0; i < maxSamples; i++) {
+                        if (!dataManager.hasNext()) {
+                            Log.e(TAG, "Not enough samples.");
+                            break;
+                        }
+                        // get next
+                        dataManager.next();
 
-            } finally {
-                if (dataManager != null) {
-                    dataManager.close(); // ensure closure even on failure
+                        // get data
+                        float[] data = dataManager.getData(random.nextBoolean());
+                        int label = dataManager.getLabel();
+
+                        try {
+                            tl.addSample(data, CIFAR10BatchFileParser.getClass(label)).get();
+                        } catch (ExecutionException | InterruptedException e) {
+                            e.printStackTrace();
+                            return false;
+                        }
+                    }
+
+                } catch (IOException e) {
+                    e.printStackTrace();
+                    return false;
+
+                } finally {
+                    if (dataManager != null) {
+                        dataManager.close(); // ensure closure even on failure
+                    }
                 }
             }
             // close dataManager (not needed any more)

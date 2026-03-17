@@ -202,6 +202,8 @@ public final class TransferLearningModel implements Closeable {
 
     trainingBatchBottlenecks =
         allocateBuffer(getTrainBatchSize() * numBottleneckFeatures() * FLOAT_BYTES);
+      
+    Log.d("TransferLearningModel", "Initialized batch size: " + getTrainBatchSize());
 
     int batchClassesNumElements = getTrainBatchSize() * classes.size();
     trainingBatchClasses = allocateBuffer(batchClassesNumElements * FLOAT_BYTES);
@@ -269,6 +271,7 @@ public final class TransferLearningModel implements Closeable {
     checkNotTerminating();
 
     Log.d("TransferLearningModel", "Entered train() with epochs = " + numEpochs);
+    Log.d("TransferLearningModel", "Batch size (train_head expected): " + getTrainBatchSize());
 
     if (trainingSamples.size() < getTrainBatchSize()) {
       Log.d("TransferLearningModel", "📦 trainingSamples = " + trainingSamples.size() + ", batchSize = " + getTrainBatchSize());
